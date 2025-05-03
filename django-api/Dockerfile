@@ -37,6 +37,6 @@ COPY --from=builder /app /app
 ENV PATH="/app/.venv/bin:${PATH}"
 
 # Expose the port your Django application will run on
-EXPOSE 8000
+EXPOSE 8050
 
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8050"]
