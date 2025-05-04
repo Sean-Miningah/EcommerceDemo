@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router";
-import { ShoppingCart } from "lucide-react";
-import { useCart } from "@/contexts/CartContext";
+import { ShoppingCart, Loader2 } from "lucide-react";
+import { useCart } from "@/hooks/api/useCart";
 import { ProductData } from "@/types/api";
 
 type ProductCardProps = {
@@ -9,10 +10,18 @@ type ProductCardProps = {
 };
 
 export function ProductCard({ product }: ProductCardProps) {
-  const { addItem } = useCart();
+  const { addToCart } = useCart();
+  const [isAdding, setIsAdding] = useState(false); // Add loading state
 
   const handleAddToCart = async () => {
-    await addItem(product);
+    setIsAdding(true);
+    try {
+      await addToCart(parseInt(product.id), 1);
+    } catch (error) {
+      console.error("Failed to add item to cart:", error);
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   return (
@@ -43,8 +52,17 @@ export function ProductCard({ product }: ProductCardProps) {
           variant="default"
           size="sm"
           className="w-full"
+          disabled={isAdding}
         >
-          <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+          {isAdding ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding...
+            </>
+          ) : (
+            <>
+              <ShoppingCart className="mr-2 h-4 w-4" /> Add to Cart
+            </>
+          )}
         </Button>
       </div>
     </div>

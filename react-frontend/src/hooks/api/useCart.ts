@@ -1,148 +1,90 @@
-import { useState, useEffect, useCallback } from 'react';
-import apiClient from '@/lib/api/client';
-import { CartItemData, CartSummary, ProductData } from '@/lib/api/types';
-import { useAuth } from './useAuth';
+import { useSelector } from 'react-redux';
+import { RootState, useAppDispatch } from '@/store';
+import {
+  fetchCartItems,
+  addToCart,
+  updateCartItem,
+  removeCartItem,
+  clearCart as clearCartAction,
+  clearCartError,
+} from '@/store/slices/cartSlice';
 
 export const useCart = () => {
-  const [items, setItems] = useState<CartItemData[]>([]);
-  const [itemCount, setItemCount] = useState(0);
-  const [subtotal, setSubtotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { items, loading, error, totalItems } = useSelector(
+    (state: RootState) => state.cart
+  );
 
-  const { getCurrentUser } = useAuth();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  // Check if user is authenticated
-  useEffect(() => {
-    const checkAuth = async () => {
-      const user = await getCurrentUser();
-      setIsAuthenticated(!!user);
-    };
-
-    checkAuth();
-  }, [getCurrentUser]);
-
-  // Fetch cart from API
-  const fetchCart = useCallback(async () => {
-    if (!isAuthenticated) return;
-
-    setIsLoading(true);
-    setError(null);
-
+  const getCartItems = async () => {
     try {
-      const response = await apiClient.get<CartSummary>('/cart/summary/');
-      setItems(response.data.items);
-      setItemCount(response.data.count);
-      setSubtotal(response.data.total);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to fetch cart. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated]);
-
-  // Initialize cart on authentication status change
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchCart();
-    }
-  }, [isAuthenticated, fetchCart]);
-
-  // Add item to cart
-  const addItem = async (product: ProductData, quantity = 1) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await apiClient.post('/cart/', {
-        product: product.id,
-        quantity
-      });
-      fetchCart();
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to add item to cart. Please try again.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      await dispatch(fetchCartItems()).unwrap();
+      return true;
+    } catch (error) {
+      console.log("error get cart items", error)
+      return false;
     }
   };
 
-  // Remove item from cart
-  const removeItem = async (productId: string) => {
-    setIsLoading(true);
-    setError(null);
-
+  const handleAddToCart = async (productId: number, quantity = 1) => {
     try {
-      const cartItem = items.find(item => item.product === productId);
-      if (cartItem) {
-        await apiClient.delete(`/cart/${cartItem.id}/`);
-        fetchCart();
-      }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to remove item from cart. Please try again.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      await dispatch(addToCart({ productId, quantity })).unwrap();
+      return true;
+    } catch (error) {
+      console.log("error adding to cart", error)
+      return false;
     }
   };
 
-  // Update item quantity
-  const updateQuantity = async (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      return removeItem(productId);
-    }
-
-    setIsLoading(true);
-    setError(null);
-
+  const handleUpdateCartItem = async (id: number, quantity: number) => {
     try {
-      const cartItem = items.find(item => item.product === productId);
-      if (cartItem) {
-        await apiClient.patch(`/cart/${cartItem.id}/`, {
-          quantity
-        });
-        fetchCart();
-      }
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to update cart. Please try again.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      await dispatch(updateCartItem({ id, quantity })).unwrap();
+      return true;
+    } catch (error) {
+      console.log("error udpating cart item", error)
+      return false;
     }
   };
 
-  // Clear cart
-  const clearCart = async () => {
-    setIsLoading(true);
-    setError(null);
-
+  const handleRemoveCartItem = async (id: number) => {
     try {
-      await apiClient.delete('/cart/clear/');
-      fetchCart();
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to clear cart. Please try again.';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsLoading(false);
+      await dispatch(removeCartItem(id)).unwrap();
+      return true;
+    } catch (error) {
+      console.log("error removing cart item", error)
+      return false;
     }
   };
+
+  const handleClearCart = async () => {
+    try {
+      await dispatch(clearCartAction()).unwrap();
+      return true;
+    } catch (error) {
+      console.log("error clearing cart", error)
+      return false;
+    }
+  };
+
+  const handleClearError = () => {
+    dispatch(clearCartError());
+  };
+
+  // Calculate cart total
+  const cartTotal = items.reduce((total, item) => {
+    return total + item.total_price;
+  }, 0).toFixed(2);
 
   return {
-    items,
-    addItem,
-    removeItem,
-    updateQuantity,
-    clearCart,
-    itemCount,
-    subtotal,
-    isLoading,
+    cartItems: items,
+    cartTotal,
+    loading,
     error,
-    refetch: fetchCart
+    totalItems,
+    getCartItems,
+    addToCart: handleAddToCart,
+    updateCartItem: handleUpdateCartItem,
+    removeFromCart: handleRemoveCartItem,
+    clearCart: handleClearCart,
+    clearError: handleClearError,
   };
 };

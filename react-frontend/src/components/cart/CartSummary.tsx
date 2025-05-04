@@ -1,23 +1,28 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/contexts/CartContext";
-import { useAuthContext } from "@/contexts/AuthContext";
-import { useOrder } from "@/contexts/OrderContext";
+import { useCart } from "@/hooks/api/useCart";
+import { useAuth } from "@/hooks/api/useAuth";
+import { useOrders } from "@/hooks/api/useOrder";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { CartItemData } from "@/types/api";
 
 export function CartSummary() {
-  const { subtotal, itemCount, clearCart } = useCart();
-  const { isAuthenticated } = useAuthContext();
-  const { createOrder } = useOrder();
+  const { cartItems, cartTotal, totalItems, clearCart } = useCart();
+  const { isAuthenticated } = useAuth();
+  const { checkout } = useOrders();
   const navigate = useNavigate();
 
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
-  // Calculate derived values
-  const shipping = itemCount > 0 ? 5.99 : 0;
+
+  const subtotal = parseInt(cartTotal) || cartItems.reduce((sum: number, item: CartItemData) => {
+    return sum + item.total_price;
+  }, 0);
+
+  const shipping = totalItems > 0 ? 5.99 : 0;
   const total = subtotal + shipping;
 
   const handleCheckout = async () => {
@@ -34,9 +39,13 @@ export function CartSummary() {
 
     setIsCheckingOut(true);
     try {
-      const order = await createOrder();
-      toast.success("Order placed successfully!");
-      navigate(`/orders/${order.id}`);
+      const success = await checkout();
+      if (success) {
+        toast.success("Order placed successfully!");
+        navigate(`/orders`);
+      } else {
+        throw new Error("Failed to create order");
+      }
     } catch (error) {
       toast.error("Failed to create order", {
         description: "Please try again or contact customer support.",
@@ -50,8 +59,12 @@ export function CartSummary() {
   const handleClearCart = async () => {
     setIsClearing(true);
     try {
-      await clearCart();
-      toast.success("Cart cleared successfully");
+      const success = await clearCart();
+      if (success) {
+        toast.success("Cart cleared successfully");
+      } else {
+        throw new Error("Failed to clear cart");
+      }
     } catch (error) {
       toast.error("Failed to clear cart");
       console.error("Clear cart error:", error);
@@ -67,7 +80,7 @@ export function CartSummary() {
       <div className="space-y-3">
         <div className="flex justify-between">
           <span>Subtotal</span>
-          <span>${subtotal.toFixed(2)}</span>
+          <span>${typeof subtotal === 'string' ? subtotal : subtotal.toFixed(2)}</span>
         </div>
 
         <div className="flex justify-between">
@@ -81,7 +94,7 @@ export function CartSummary() {
 
         <div className="border-t pt-3 mt-3 flex justify-between font-medium">
           <span>Total</span>
-          <span>${total.toFixed(2)}</span>
+          <span>${typeof total === 'string' ? total : total.toFixed(2)}</span>
         </div>
       </div>
 
@@ -89,7 +102,7 @@ export function CartSummary() {
         <Button
           className="w-full"
           onClick={handleCheckout}
-          disabled={itemCount === 0 || isCheckingOut}
+          disabled={totalItems === 0 || isCheckingOut}
         >
           {isCheckingOut ? (
             <>
@@ -105,7 +118,7 @@ export function CartSummary() {
           variant="outline"
           className="w-full"
           onClick={handleClearCart}
-          disabled={itemCount === 0 || isClearing}
+          disabled={totalItems === 0 || isClearing}
         >
           {isClearing ? (
             <>

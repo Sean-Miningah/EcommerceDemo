@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Trash2, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/api/useCart";
 import { CartItemData } from "@/types/api";
 
 interface CartItemProps {
@@ -10,16 +10,18 @@ interface CartItemProps {
 }
 
 export function CartItem({ item }: CartItemProps) {
-  const { updateQuantity, removeItem } = useCart();
+  const { updateCartItem, removeFromCart } = useCart();
   const [isUpdating, setIsUpdating] = useState(false);
-  const { product: productDetail, quantity } = item;
-
+  const { product_detail, quantity, id } = item;
   const handleQuantityChange = async (newQuantity: number) => {
     if (newQuantity < 1) return;
 
     setIsUpdating(true);
     try {
-      await updateQuantity(productDetail.id, newQuantity);
+      const success = await updateCartItem(parseInt(id), newQuantity);
+      if (!success) {
+        throw new Error("Failed to update quantity");
+      }
     } catch (error) {
       console.error("Failed to update quantity:", error);
     } finally {
@@ -30,7 +32,10 @@ export function CartItem({ item }: CartItemProps) {
   const handleRemove = async () => {
     setIsUpdating(true);
     try {
-      await removeItem(productDetail.id);
+      const success = await removeFromCart(parseInt(id));
+      if (!success) {
+        throw new Error("Failed to remove item");
+      }
     } catch (error) {
       console.error("Failed to remove item:", error);
     } finally {
@@ -38,16 +43,17 @@ export function CartItem({ item }: CartItemProps) {
     }
   };
 
-  const totalPrice = productDetail.price * quantity;
+  // Use total_price from the API response or calculate it
+  const totalPrice = item.total_price || (product_detail.price * quantity);
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center py-4 border-b gap-4">
       <div className="w-full sm:w-24 h-24 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
-        <Link to={`/products/${productDetail.id}`}>
-          {productDetail.image ? (
+        <Link to={`/products/${product_detail.id}`}>
+          {product_detail.image ? (
             <img
-              src={productDetail.image}
-              alt={productDetail.name}
+              src={product_detail.image}
+              alt={product_detail.name}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -59,10 +65,10 @@ export function CartItem({ item }: CartItemProps) {
       </div>
 
       <div className="flex-grow">
-        <Link to={`/products/${productDetail.id}`} className="hover:text-primary transition-colors">
-          <h3 className="font-medium mb-1">{productDetail.name}</h3>
+        <Link to={`/products/${product_detail.id}`} className="hover:text-primary transition-colors">
+          <h3 className="font-medium mb-1">{product_detail.name}</h3>
         </Link>
-        <p className="text-sm text-gray-500 mb-2">{productDetail.category_name}</p>
+        <p className="text-sm text-gray-500 mb-2">{product_detail.category_name}</p>
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center border rounded">
             <Button
@@ -89,7 +95,7 @@ export function CartItem({ item }: CartItemProps) {
           </div>
 
           <span className="font-medium">
-            ${totalPrice.toFixed(2)}
+            ${typeof totalPrice === 'string' ? totalPrice : totalPrice.toFixed(2)}
           </span>
 
           <Button

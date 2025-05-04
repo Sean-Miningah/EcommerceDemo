@@ -1,17 +1,25 @@
+import { useEffect } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { CartItem } from "@/components/cart/CartItem";
 import { CartSummary } from "@/components/cart/CartSummary";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/api/useCart";
 import { Link } from "react-router";
 import { ShoppingCart, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CartItemData } from "@/types/api";
 
 const CartPage = () => {
-  const { items, itemCount, isLoading, error, refetch } = useCart();
+  const { cartItems, totalItems, loading, error, getCartItems } = useCart();
+
+
+  useEffect(() => {
+    getCartItems();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Loading state
-  if (isLoading) {
+  if (loading) {
     return (
       <PageLayout>
         <div className="container mx-auto px-4 py-8">
@@ -74,7 +82,7 @@ const CartPage = () => {
               <p className="text-xl font-medium mb-2">Error loading your cart</p>
               <p className="text-gray-600 mb-6">{error}</p>
             </div>
-            <Button onClick={refetch} className="flex items-center gap-2">
+            <Button onClick={() => getCartItems()} className="flex items-center gap-2">
               <RefreshCcw className="h-4 w-4" />
               Try Again
             </Button>
@@ -85,7 +93,7 @@ const CartPage = () => {
   }
 
   // Empty cart state
-  if (itemCount === 0) {
+  if (totalItems === 0) {
     return (
       <PageLayout>
         <div className="container mx-auto px-4 py-8">
@@ -114,7 +122,7 @@ const CartPage = () => {
           <div className="lg:w-2/3">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="divide-y">
-                {items.map((item) => (
+                {cartItems.map((item: CartItemData) => (
                   <CartItem
                     key={item.id}
                     item={item}

@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { PageLayout } from "@/components/layout/PageLayout";
-import { useAuthContext } from "@/contexts/AuthContext";
 import { Navigate } from "react-router";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -26,137 +25,133 @@ import { Button } from "@/components/ui/button";
 import { Pencil, Trash2, Plus, RefreshCcw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { useProducts } from "@/contexts/ProductContext";
-import { useAdminPanel } from "@/hooks/api/useAdminPanel";
+import { useProducts } from "@/hooks/api/useProducts";
+import { useAuth } from "@/hooks/api/useAuth";
+import { useOrders } from "@/hooks/api/useOrder";
 import { ProductData, OrderData } from "@/types/api";
 import { ProductForm } from "@/components/admin/ProductForm";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const AdminPage = () => {
-  const { user } = useAuthContext();
-  const { products, isLoading: productsLoading, error: productsError, refetch: refetchProducts } = useProducts();
+  const { user } = useAuth();
+  const {
+    products,
+    loading: productsLoading,
+    error: productsError,
+    getProducts
+  } = useProducts();
+
+  const {
+    orders,
+    loading: ordersLoading,
+    error: ordersError,
+    getOrders,
+    updateOrderStatus,
+  } = useOrders();
+
   const [selectedProduct, setSelectedProduct] = useState<ProductData | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [orders, setOrders] = useState<OrderData[]>([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
-  const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [adminActionLoading, setAdminActionLoading] = useState(false);
 
-  // Get admin functions from our hook
-  const {
-    createProduct,
-    updateProduct,
-    deleteProduct,
-    getAllOrders,
-    updateOrderStatus,
-    isLoading: adminActionLoading,
-    error: adminActionError
-  } = useAdminPanel();
+  useEffect(() => {
+    // Only fetch data if user is admin
+    if (user && user.role === "ADMIN") {
+      getProducts();
+      getOrders();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
-  // If user is not admin, redirect to home
-  if (!user || user.role !== "admin") {
+  // Redirect non-admin users
+  if (!user || user.role !== "ADMIN") {
     return <Navigate to="/" replace />;
   }
 
-  // Fetch all orders when the component mounts
-  useEffect(() => {
-    const fetchOrders = async () => {
-      setOrdersLoading(true);
-      try {
-        const ordersData = await getAllOrders();
-        setOrders(ordersData);
-        setOrdersError(null);
-      } catch (err: any) {
-        setOrdersError(err.message || 'Failed to fetch orders');
-      } finally {
-        setOrdersLoading(false);
-      }
-    };
-
-    fetchOrders();
-  }, [getAllOrders]);
-
-  // Handle product operations
-  const handleAddProduct = async (productData: Omit<ProductData, 'id' | 'created_at'>) => {
+  const handleAddProduct = async (data: FormData) => {
+    setAdminActionLoading(true);
     try {
+      const productData = {
+        name: data.get('name') as string,
+        description: data.get('description') as string,
+        price: parseFloat(data.get('price') as string),
+        category: data.get('category') as string,
+        image: data.get('image') as string
+      };
+
       await createProduct(productData);
       setIsAddDialogOpen(false);
-      refetchProducts();
+      getProducts(); // Refresh the product list
       toast.success("Product added successfully");
     } catch (err) {
       toast.error("Failed to add product");
       console.error(err);
+    } finally {
+      setAdminActionLoading(false);
     }
   };
 
-  const handleUpdateProduct = async (productData: Partial<ProductData>) => {
+  const handleUpdateProduct = async (data: FormData) => {
     if (!selectedProduct) return;
 
+    setAdminActionLoading(true);
     try {
+      // Convert FormData to the expected format
+      const productData: Partial<ProductData> = {
+        name: data.get('name') as string,
+        description: data.get('description') as string,
+        price: parseFloat(data.get('price') as string),
+        category: data.get('category') as string,
+      };
+
+      // Handle the image separately if it exists
+      const imageFile = data.get('image') as File;
+      if (imageFile && imageFile.size > 0) {
+        // Here you would typically upload the image and get a URL back
+        // For now, we'll just log it
+        console.log("Image file to upload:", imageFile);
+        // You might set productData.image = uploadedImageUrl here
+      }
+
       await updateProduct(selectedProduct.id, productData);
       setIsEditDialogOpen(false);
       setSelectedProduct(null);
-      refetchProducts();
+      getProducts(); // Refresh the product list
       toast.success("Product updated successfully");
     } catch (err) {
       toast.error("Failed to update product");
       console.error(err);
+    } finally {
+      setAdminActionLoading(false);
     }
   };
 
   const handleDeleteProduct = async (productId: string) => {
+    setAdminActionLoading(true);
     try {
+      // Using our custom Redux API service
       await deleteProduct(productId);
-      refetchProducts();
+      getProducts(); // Refresh the product list
       toast.success("Product deleted successfully");
     } catch (err) {
       toast.error("Failed to delete product");
       console.error(err);
+    } finally {
+      setAdminActionLoading(false);
     }
   };
 
-  // Handle order status update
-  const handleUpdateOrderStatus = async (orderId: string, status: OrderData['status']) => {
+  // Handle order status update using Redux
+  const handleUpdateOrderStatus = async (orderId: number, status: OrderData['status']) => {
     try {
       await updateOrderStatus(orderId, status);
-
-      // Update orders state after status change
-      setOrders(orders.map(order =>
-        order.id === orderId ? { ...order, status } : order
-      ));
-
       toast.success(`Order status updated to ${status}`);
     } catch (err) {
       toast.error("Failed to update order status");
       console.error(err);
     }
   };
-
-  // Mock user data (for the Users tab)
-  const users = [
-    {
-      id: "1",
-      name: "Admin User",
-      email: "admin@example.com",
-      role: "admin",
-      registered: "2023-01-15"
-    },
-    {
-      id: "2",
-      name: "John Doe",
-      email: "john@example.com",
-      role: "user",
-      registered: "2023-03-22"
-    },
-    {
-      id: "3",
-      name: "Jane Smith",
-      email: "jane@example.com",
-      role: "user",
-      registered: "2023-05-10"
-    }
-  ];
 
   // Render loading states for products tab
   const renderProductsLoading = () => (
@@ -199,7 +194,7 @@ const AdminPage = () => {
   const renderProductsError = () => (
     <div className="text-center py-8">
       <p className="text-red-500 mb-4">{productsError}</p>
-      <Button onClick={refetchProducts} variant="outline">
+      <Button onClick={() => getProducts()} variant="outline">
         <RefreshCcw className="mr-2 h-4 w-4" />
         Try Again
       </Button>
@@ -246,12 +241,28 @@ const AdminPage = () => {
   const renderOrdersError = () => (
     <div className="text-center py-8">
       <p className="text-red-500 mb-4">{ordersError}</p>
-      <Button onClick={() => getAllOrders()} variant="outline">
+      <Button onClick={() => getOrders()} variant="outline">
         <RefreshCcw className="mr-2 h-4 w-4" />
         Try Again
       </Button>
     </div>
   );
+
+  // To be Implemented
+  const createProduct = async (productData: Omit<ProductData, 'id' | 'created_at' | 'category_name'>) => {
+    console.log("product date", productData)
+    return ""
+  };
+
+  const updateProduct = async (id: string | number, productData: Partial<ProductData>) => {
+    console.log("product date", productData, id)
+    return ""
+  };
+
+  const deleteProduct = async (id: string | number) => {
+    console.log("product date", id)
+    return ""
+  };
 
   return (
     <PageLayout>
@@ -325,7 +336,7 @@ const AdminPage = () => {
                               {product.name}
                             </TableCell>
                             <TableCell>{product.category_name}</TableCell>
-                            <TableCell>${product.price.toFixed(2)}</TableCell>
+                            <TableCell>${product.price}</TableCell>
                             <TableCell>
                               <div className="flex gap-2">
                                 <Dialog open={isEditDialogOpen && selectedProduct?.id === product.id} onOpenChange={(open) => {
@@ -425,7 +436,7 @@ const AdminPage = () => {
                             <TableCell>{order.user}</TableCell>
                             <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                             <TableCell>{order.items.length}</TableCell>
-                            <TableCell>${order.total_amount.toFixed(2)}</TableCell>
+                            <TableCell>${order.total_amount}</TableCell>
                             <TableCell>
                               <Badge
                                 variant={
@@ -465,7 +476,7 @@ const AdminPage = () => {
                                           <div className="flex items-center gap-2">
                                             <select
                                               value={order.status}
-                                              onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value as OrderData['status'])}
+                                              onChange={(e) => handleUpdateOrderStatus(parseInt(order.id), e.target.value as OrderData['status'])}
                                               className="mt-1 block pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
                                               disabled={adminActionLoading}
                                             >
@@ -506,14 +517,14 @@ const AdminPage = () => {
                                                     {item.product_detail.name}
                                                   </div>
                                                 </TableCell>
-                                                <TableCell>${item.price.toFixed(2)}</TableCell>
+                                                <TableCell>${item.price}</TableCell>
                                                 <TableCell>{item.quantity}</TableCell>
-                                                <TableCell>${item.total_price.toFixed(2)}</TableCell>
+                                                <TableCell>${item.total_price}</TableCell>
                                               </TableRow>
                                             ))}
                                             <TableRow>
                                               <TableCell colSpan={3} className="text-right font-medium">Total</TableCell>
-                                              <TableCell className="font-bold">${order.total_amount.toFixed(2)}</TableCell>
+                                              <TableCell className="font-bold">${order.total_amount}</TableCell>
                                             </TableRow>
                                           </TableBody>
                                         </Table>
@@ -551,7 +562,7 @@ const AdminPage = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map((user) => (
+                    {/* {users.map((user) => (
                       <TableRow key={user.id}>
                         <TableCell className="font-medium">{user.id}</TableCell>
                         <TableCell>{user.name}</TableCell>
@@ -565,7 +576,7 @@ const AdminPage = () => {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ))} */}
                   </TableBody>
                 </Table>
               </div>

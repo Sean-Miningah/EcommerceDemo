@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useProducts } from "@/contexts/ProductContext";
+import { useProducts } from "@/hooks/api/useProducts";
 import { Label } from "@/components/ui/label";
 import {
   Accordion,
@@ -9,41 +9,61 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { CategoryData } from "@/types/api";
 
 export function ProductFilters() {
   const {
     categories,
-    selectedCategories,
-    setSelectedCategories,
-    priceRange,
-    setPriceRange,
-    isLoading, // Add this to show loading state
+    loading,
+    currentFilters,
+    setFilters
   } = useProducts();
 
-  const [localPriceRange, setLocalPriceRange] = useState<[number, number]>([
-    priceRange.min,
-    priceRange.max,
-  ]);
+  const MAX_PRICE = 1000;
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
-  // Update local price range when the context price range changes
+  const [localPriceRange, setLocalPriceRange] = useState<[number, number]>([0, 1000]);
+
   useEffect(() => {
-    setLocalPriceRange([priceRange.min, priceRange.max]);
-  }, [priceRange.min, priceRange.max]);
+    if (currentFilters) {
+      if (currentFilters.categories) {
+        setSelectedCategories(currentFilters.categories);
+      }
+      if (currentFilters.priceRange) {
+        setLocalPriceRange(currentFilters.priceRange);
+      }
+    }
+  }, [currentFilters]);
 
+  // Handle category selection changes
   const handleCategoryChange = (categoryId: string, checked: boolean) => {
-    setSelectedCategories(
-      checked
-        ? [...selectedCategories, categoryId]
-        : selectedCategories.filter((id) => id !== categoryId)
-    );
+    const newSelectedCategories = checked
+      ? [...selectedCategories, categoryId]
+      : selectedCategories.filter((id) => id !== categoryId);
+
+    setSelectedCategories(newSelectedCategories);
+
+    // Update filters in Redux
+    setFilters({
+      ...currentFilters,
+      categories: newSelectedCategories,
+      page: 1
+    });
   };
 
+  // Handle local price range slider changes
   const handlePriceChange = (values: number[]) => {
     setLocalPriceRange([values[0], values[1]]);
   };
 
+  // When price slider is released, apply the filter
   const handlePriceChangeEnd = () => {
-    setPriceRange(localPriceRange[0], localPriceRange[1]);
+    // Update filters in Redux
+    setFilters({
+      ...currentFilters,
+      priceRange: localPriceRange,
+      page: 1
+    });
   };
 
   return (
@@ -55,19 +75,19 @@ export function ProductFilters() {
           <AccordionItem value="categories">
             <AccordionTrigger className="text-sm font-medium">Categories</AccordionTrigger>
             <AccordionContent>
-              {isLoading ? (
+              {loading ? (
                 <div className="space-y-2 mt-2">
                   <p className="text-sm text-gray-500">Loading categories...</p>
                 </div>
               ) : (
                 <div className="space-y-2 mt-2">
-                  {categories.map((category) => (
+                  {categories.map((category: CategoryData) => (
                     <div key={category.id} className="flex items-center space-x-2">
                       <Checkbox
                         id={`category-${category.id}`}
-                        checked={selectedCategories.includes(category.id)}
+                        checked={selectedCategories.includes(category.id.toString())}
                         onCheckedChange={(checked) =>
-                          handleCategoryChange(category.id, checked as boolean)
+                          handleCategoryChange(category.id.toString(), checked as boolean)
                         }
                       />
                       <Label
@@ -89,13 +109,13 @@ export function ProductFilters() {
               <div className="space-y-4 mt-2 px-1">
                 <Slider
                   min={0}
-                  max={1000}
+                  max={MAX_PRICE} // Use the defined maximum price constant
                   step={10}
                   value={[localPriceRange[0], localPriceRange[1]]}
                   onValueChange={handlePriceChange}
                   onValueCommit={handlePriceChangeEnd}
                   className="mt-6"
-                  disabled={isLoading}
+                  disabled={loading}
                 />
                 <div className="flex justify-between mt-2">
                   <span className="text-sm">

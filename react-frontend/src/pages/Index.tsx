@@ -4,28 +4,31 @@ import { ShoppingCart, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { ProductCard } from "@/components/products/ProductCard";
-// Import the hooks
-import { useProducts } from "@/contexts/ProductContext";
+import { useProducts } from "@/hooks/api/useProducts";
+import { CategoryData, ProductData } from "@/types/api";
 
 const Index = () => {
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  // Use the products hook to get all products and categories
+  const [featuredProducts, setFeaturedProducts] = useState<ProductData[]>([]);
+
+
   const {
     products,
     categories,
-    isLoading,
-    error
+    loading,
+    error,
+    getProducts,
+    getCategories
   } = useProducts();
 
-
-
-  // Get featured products when products are loaded
+  // Fetch products and categories when component mounts
   useEffect(() => {
+    getProducts();
+    getCategories();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    console.log('categories ', categories)
+  useEffect(() => {
     if (products.length > 0) {
-      // You could apply your own logic to determine "featured" products
-      // For now, just taking the first 4 as an example
       setFeaturedProducts(products.slice(0, 4));
     }
   }, [products]);
@@ -98,7 +101,7 @@ const Index = () => {
             </Link>
           </div>
 
-          {isLoading ? (
+          {loading ? ( // Changed from isLoading to loading
             <div className="flex justify-center items-center h-64">
               <p className="text-lg">Loading products...</p>
             </div>
@@ -108,7 +111,7 @@ const Index = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product) => (
+              {featuredProducts.map((product: ProductData) => (
                 <ProductCard key={product.id} product={product} />
               ))}
             </div>
@@ -121,13 +124,13 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <h2 className="text-2xl font-bold mb-8 text-center">Shop by Category</h2>
 
-          {isLoading ? (
+          {loading ? ( // Changed from isLoading to loading
             <div className="flex justify-center items-center h-64">
               <p className="text-lg">Loading categories...</p>
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {categories.map((category) => (
+              {categories.map((category: CategoryData) => (
                 <Link to={`/products?category=${category.id}`} key={category.id} className="group">
                   <div className="rounded-lg overflow-hidden">
                     <div className="bg-black bg-opacity-30 flex items-center justify-center group-hover:bg-opacity-20 transition-all">

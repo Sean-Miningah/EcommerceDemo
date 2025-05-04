@@ -7,15 +7,9 @@ import { Button } from "@/components/ui/button";
 import { SlidersHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-// import { useSearchParams } from "react-router";
-// import { useProducts } from "@/contexts/ProductContext";
 
 const ProductsPage = () => {
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-  // const [searchParams, setSearchParams] = useSearchParams();
-
-  // This component doesn't need to pass props down anymore
-  // since all child components are using the context
 
   return (
     <PageLayout>

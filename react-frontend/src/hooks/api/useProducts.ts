@@ -1,162 +1,109 @@
-import { useState, useEffect, useCallback } from 'react';
-import apiClient from '@/lib/api/client';
+import { useSelector } from 'react-redux';
+import { useCallback, useEffect } from 'react';
+import { RootState, useAppDispatch } from '@/store';
 import {
-  ProductData,
-  CategoryData,
-  PaginatedResponse
-} from '@/types/api';
+  fetchProducts,
+  fetchProductById,
+  fetchCategories,
+  clearProductError,
+  clearProduct,
+  setProductFilters,
+  // setInitialDataLoaded,
+  ProductFilters
+} from '@/store/slices/productSlice';
 
-type SortOption = "name_asc" | "name_desc" | "price_asc" | "price_desc";
+export const useProducts = () => {
+  const dispatch = useAppDispatch();
+  const {
+    products,
+    product,
+    categories,
+    loading,
+    error,
+    totalCount,
+    nextPage,
+    previousPage,
+    filters: currentFilters,
+    initialDataLoaded
+  } = useSelector((state: RootState) => state.products);
 
-interface UseProductsOptions {
-  initialPage?: number;
-  initialCategories?: string[];
-  initialPriceRange?: { min: number; max: number };
-  initialSortOption?: SortOption;
-}
-
-export const useProducts = (options: UseProductsOptions = {}) => {
-  const [products, setProducts] = useState<ProductData[]>([]);
-  const [categories, setCategories] = useState<CategoryData[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<ProductData[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-
-  const [currentPage, setCurrentPage] = useState(options.initialPage || 1);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(options.initialCategories || []);
-  const [priceRange, setPriceRange] = useState<{ min: number; max: number }>(
-    options.initialPriceRange || { min: 0, max: 1000 }
-  );
-  const [sortOption, setSortOption] = useState<SortOption>(options.initialSortOption || "name_asc");
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const productsPerPage = 10;
-
-  const getSortParam = (option: SortOption): string => {
-    switch (option) {
-      case "name_asc": return "name";
-      case "name_desc": return "-name";
-      case "price_asc": return "price";
-      case "price_desc": return "-price";
-      default: return "name";
-    }
-  };
-
-  // Build query parameters for API request
-  const buildQueryParams = useCallback(() => {
-    const params = new URLSearchParams();
-
-    // Pagination
-    params.append('page', currentPage.toString());
-
-    // Sorting
-    params.append('ordering', getSortParam(sortOption));
-
-    // Category filtering
-    if (selectedCategories.length > 0) {
-      selectedCategories.forEach(category => {
-        params.append('category', category);
-      });
-    }
-
-    // Price range filtering
-    if (priceRange.min > 0) {
-      params.append('min_price', priceRange.min.toString());
-    }
-
-    params.append('max_price', priceRange.max.toString());
-
-    return params.toString();
-  }, [currentPage, sortOption, selectedCategories, priceRange]);
-
-  // Fetch products from the API
-  const fetchProducts = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const queryParams = buildQueryParams();
-      const response = await apiClient.get<PaginatedResponse<ProductData>>(
-        `/products/?${queryParams}`
-      );
-
-      setFilteredProducts(response.data.results);
-      setTotalCount(response.data.count);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to fetch products. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [buildQueryParams]);
-
-  // Fetch all products (used for initial data and potentially for client-side operations)
-  const fetchAllProducts = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.get<PaginatedResponse<ProductData>>('/products/?limit=1000');
-      setProducts(response.data.results);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to fetch all products. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Fetch categories from the API
-  const fetchCategories = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.get<PaginatedResponse<CategoryData>>('/products/categories/');
-      setCategories(response.data.results);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to fetch categories. Please try again.';
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Initialize data on mount
+  // Effect to fetch products when filters change
   useEffect(() => {
-    const initializeData = async () => {
-      await Promise.all([fetchCategories(), fetchAllProducts()]);
-    };
+    if (currentFilters) {
+      dispatch(fetchProducts(currentFilters));
+    }
+  }, [dispatch, currentFilters]);
 
-    initializeData();
-  }, [fetchCategories, fetchAllProducts]);
-
-  // Fetch filtered products whenever filters or pagination change
+  // Effect to load initial data (categories) only once
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts, currentPage, sortOption, selectedCategories, priceRange]);
+    if (!initialDataLoaded) {
+      dispatch(fetchCategories());
+    }
+  }, [dispatch, initialDataLoaded]);
 
-  // Calculate total pages
-  const totalPages = Math.ceil(totalCount / productsPerPage);
+  // Set filters and let the effect trigger the API call
+  const setFilters = useCallback((filters: ProductFilters) => {
+    dispatch(setProductFilters(filters));
+  }, [dispatch]);
+
+  // Updated to use the setFilters function
+  const getProducts = useCallback((page = 1, ordering?: string) => {
+    setFilters({
+      ...currentFilters,
+      page,
+      ...(ordering ? { ordering } : {})
+    });
+    return true;
+  }, [setFilters, currentFilters]);
+
+  // This function doesn't need to change
+  const getProductById = useCallback(async (id: number) => {
+    try {
+      await dispatch(fetchProductById(id)).unwrap();
+      return true;
+    } catch (error) {
+      console.log("Error getting product by id", error);
+      return false;
+    }
+  }, [dispatch]);
+
+  // Only force a categories fetch if required
+  const getCategories = useCallback(async () => {
+    if (!initialDataLoaded) {
+      try {
+        await dispatch(fetchCategories()).unwrap();
+        return true;
+      } catch (error) {
+        console.log("Error getting categories", error);
+        return false;
+      }
+    }
+    return true;
+  }, [dispatch, initialDataLoaded]);
+
+  const handleClearError = useCallback(() => {
+    dispatch(clearProductError());
+  }, [dispatch]);
+
+  const handleClearProduct = useCallback(() => {
+    dispatch(clearProduct());
+  }, [dispatch]);
 
   return {
     products,
+    product,
     categories,
-    filteredProducts,
-    currentPage,
-    totalPages,
-    isLoading,
+    loading,
     error,
-    setCurrentPage,
-    setSelectedCategories,
-    setPriceRange: (min: number, max: number) => setPriceRange({ min, max }),
-    setSortOption,
-    selectedCategories,
-    priceRange,
-    sortOption,
-    productsPerPage,
     totalCount,
-    refetch: fetchProducts
+    nextPage,
+    previousPage,
+    currentFilters,
+    getProducts,
+    getProductById,
+    getCategories,
+    setFilters,
+    clearError: handleClearError,
+    clearProduct: handleClearProduct,
   };
 };

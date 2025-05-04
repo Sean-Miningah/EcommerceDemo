@@ -1,18 +1,15 @@
-
 import { useState, FormEvent } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageLayout } from "@/components/layout/PageLayout";
-import { useAuthContext } from "@/contexts/AuthContext";
+import { useAuth } from "@/hooks/api/useAuth";
 
 const LoginPage = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuthContext();
+  const { login, loading, error, clearError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -22,16 +19,12 @@ const LoginPage = () => {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setError("");
-    setIsLoading(true);
+    clearError(); // Clear any previous errors
 
-    try {
-      await login(email, password);
+
+    const success = await login({ email, password });
+    if (success) {
       navigate(redirectTo);
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -90,9 +83,9 @@ const LoginPage = () => {
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={isLoading}
+                  disabled={loading}
                 >
-                  {isLoading ? "Signing In..." : "Sign In"}
+                  {loading ? "Signing In..." : "Sign In"}
                 </Button>
               </div>
             </form>

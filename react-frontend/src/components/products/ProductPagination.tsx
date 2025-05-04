@@ -1,18 +1,26 @@
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useProducts } from "@/contexts/ProductContext";
+import { useProducts } from "@/hooks/api/useProducts";
 
 export function ProductPagination() {
-  const { currentPage, totalPages, setCurrentPage, isLoading } = useProducts();
+  const { loading, totalCount, currentFilters, setFilters } = useProducts();
+  const itemsPerPage = 12;
+  const totalPages = Math.ceil(totalCount / itemsPerPage);
+  const currentPage = currentFilters?.page || 1;
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-    // Scroll to top when changing page
+    if (page === currentPage) return;
+
+    setFilters({
+      ...currentFilters,
+      page
+    });
+
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Don't render pagination if there's only one page or loading
-  if (totalPages <= 1 || isLoading) {
+
+  if (totalPages <= 1 || loading) {
     return null;
   }
 
@@ -22,46 +30,37 @@ export function ProductPagination() {
     const maxPagesToShow = 5;
 
     if (totalPages <= maxPagesToShow) {
-      // If total pages is less than or equal to maxPagesToShow, show all pages
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
       }
     } else {
-      // Always include first page
       pages.push(1);
 
-      // Calculate start and end pages to show
       let startPage = Math.max(2, currentPage - 1);
       let endPage = Math.min(totalPages - 1, currentPage + 1);
 
-      // Adjust if we're near the beginning
       if (currentPage <= 3) {
         startPage = 2;
         endPage = 4;
       }
 
-      // Adjust if we're near the end
       if (currentPage >= totalPages - 2) {
         startPage = totalPages - 3;
         endPage = totalPages - 1;
       }
 
-      // Add ellipsis after first page if needed
       if (startPage > 2) {
         pages.push("...");
       }
 
-      // Add middle pages
       for (let i = startPage; i <= endPage; i++) {
         pages.push(i);
       }
 
-      // Add ellipsis before last page if needed
       if (endPage < totalPages - 1) {
         pages.push("...");
       }
 
-      // Always include last page
       pages.push(totalPages);
     }
 

@@ -1,23 +1,25 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { PageLayout } from "@/components/layout/PageLayout";
-import { useCart } from "@/contexts/CartContext";
-import { useAuthContext } from "@/contexts/AuthContext";
+import { useCart } from "@/hooks/api/useCart"
+import { useAuth } from "@/hooks/api/useAuth";
+import { useOrders } from "@/hooks/api/useOrder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
+import { CartItemData } from "@/types/api";
 
 const CheckoutPage = () => {
-  const { items, subtotal, clearCart } = useCart();
-  const { user } = useAuthContext();
+  const { cartItems, cartTotal, clearCart } = useCart();
+  const { user } = useAuth();
+  const { checkout } = useOrders();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    name: user?.name || "",
+    name: user?.username || "",
     email: user?.email || "",
     address: "",
     city: "",
@@ -49,28 +51,35 @@ const CheckoutPage = () => {
     setIsSubmitting(true);
 
     try {
-      // Here you would send the order to your API
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+      const success = await checkout();
 
-      toast.success("Order placed successfully!", {
-        description: "You will receive a confirmation email shortly.",
-      });
+      if (success) {
+        toast.success("Order placed successfully!", {
+          description: "You will receive a confirmation email shortly.",
+        });
 
-      // Clear the cart
-      clearCart();
+        // Clear the cart
+        await clearCart();
 
-      // Redirect to confirmation page
-      navigate("/order-confirmation");
+        navigate("/order-confirmation");
+      } else {
+        throw new Error("Checkout failed");
+      }
     } catch (error) {
       toast.error("Failed to place order", {
         description: "Please try again or contact customer support.",
       });
+      console.error("Checkout error:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   // Calculate totals
+  const subtotal = parseInt(cartTotal) || cartItems.reduce((sum: number, item: CartItemData) => {
+    return sum + item.total_price;
+  }, 0);
+
   const shipping = 5.99;
   const total = subtotal + shipping;
 
@@ -191,13 +200,15 @@ const CheckoutPage = () => {
                 <h2 className="text-xl font-medium mb-6">Order Summary</h2>
 
                 <div className="space-y-4 mb-6">
-                  {items.map((item) => (
-                    <div key={item.product.id} className="flex justify-between">
+                  {cartItems.map((item: CartItemData) => (
+                    <div key={item.id} className="flex justify-between">
                       <div>
-                        <p className="font-medium">{item.product.name}</p>
-                        <p className="text-sm text-gray-500">{item.quantity} × ${item.product.price.toFixed(2)}</p>
+                        <p className="font-medium">{item.product_detail.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {item.quantity} × ${item.product_detail.price}
+                        </p>
                       </div>
-                      <p className="font-medium">${(item.quantity * item.product.price).toFixed(2)}</p>
+                      <p className="font-medium">${item.total_price}</p>
                     </div>
                   ))}
                 </div>
@@ -207,7 +218,7 @@ const CheckoutPage = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span>Subtotal</span>
-                    <span>${subtotal.toFixed(2)}</span>
+                    <span>${typeof subtotal === 'string' ? subtotal : subtotal.toFixed(2)}</span>
                   </div>
 
                   <div className="flex justify-between">
@@ -217,14 +228,14 @@ const CheckoutPage = () => {
 
                   <div className="border-t pt-3 mt-3 flex justify-between font-medium">
                     <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span>${typeof total === 'string' ? total : total.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <Button
                   className="w-full mt-6"
                   type="submit"
-                  disabled={isSubmitting || items.length === 0}
+                  disabled={isSubmitting || cartItems.length === 0}
                 >
                   {isSubmitting ? "Processing..." : "Place Order"}
                 </Button>

@@ -23,6 +23,21 @@ export interface SignupCredentials {
   password2: string;
 }
 
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  role: 'ADMIN' | 'CUSTOMER';
+  phone_number?: string;
+}
+
+export interface AuthTokens {
+  access: string;
+  refresh: string;
+}
+
 export interface AuthResponse {
   access: string;
   refresh: string;

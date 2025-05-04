@@ -1,73 +1,87 @@
-import apiClient from '@/lib/api/client';
+import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router';
+import { RootState, useAppDispatch } from '@/store';
 import {
-  LoginCredentials,
-  SignupCredentials,
-  AuthResponse,
-} from '@/types/api';
+  login,
+  register,
+  logout,
+  getMe,
+  changePassword,
+  clearError as clearAuthError,
+} from '@/store/slices/authSlice';
+import { LoginCredentials, SignupCredentials, PasswordResetRequest } from '@/types/api';
 
 export const useAuth = () => {
-  const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, loading, error } = useSelector(
+    (state: RootState) => state.auth
+  );
+
+  const handleLogin = async (credentials: LoginCredentials) => {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/login/', credentials);
-      // Store token in localStorage
-      localStorage.setItem('token', response.data.access);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to login. Please try again.';
-      throw new Error(errorMessage);
+      await dispatch(login(credentials)).unwrap();
+      navigate('/');
+      return user;
+    } catch (error) {
+      console.log("Error when loggin in", error)
+      return false;
     }
   };
 
-  const signup = async (credentials: SignupCredentials): Promise<AuthResponse> => {
+  const handleRegister = async (userData: SignupCredentials) => {
     try {
-      const response = await apiClient.post<AuthResponse>('/auth/register/', credentials);
-      // Store token in localStorage
-      localStorage.setItem('token', response.data.access);
-      return response.data;
-    } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.detail ||
-        Object.values(err.response?.data || {}).flat().join(', ') ||
-        'Failed to create account. Please try again.';
-      throw new Error(errorMessage);
+      await dispatch(register(userData)).unwrap();
+      navigate('/login');
+      return user;
+    } catch (error) {
+      if (typeof error === 'string') {
+        return false;
+      } else return false;
     }
   };
 
-  const logout = (): void => {
-    localStorage.removeItem('token');
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate('/login');
   };
 
-  const requestPasswordReset = async (email: string): Promise<void> => {
-    // Implementation
-  };
-
-  const resetPassword = async (token: string, uidb64: string, newPassword: string): Promise<void> => {
-    // Implementation
-  };
-
-  const getCurrentUser = async (): Promise<AuthResponse['user'] | null> => {
-    const token = localStorage.getItem('token');
-
-    if (!token) {
-      return null;
-    }
-
+  const handleChangePassword = async (passwordData: PasswordResetRequest) => {
     try {
-      const response = await apiClient.get<{ user: AuthResponse['user'] }>('/auth/me/');
-      console.log("Response from getCurrentUser:", response.data);
-      return response.data.user;
-    } catch (err) {
-      localStorage.removeItem('token');
-      return null;
+      await dispatch(changePassword(passwordData)).unwrap();
+      return user;
+    } catch (error) {
+      if (typeof error === 'string') {
+        return false;
+      } else return false;
     }
+  };
+
+  const fetchCurrentUser = async () => {
+    try {
+      await dispatch(getMe()).unwrap();
+      return user;
+    } catch (error) {
+      if (typeof error === 'string') {
+        return false;
+      } else return false;
+    }
+  };
+
+  const handleClearError = () => {
+    dispatch(clearAuthError());
   };
 
   return {
-    login,
-    signup,
-    logout,
-    requestPasswordReset,
-    resetPassword,
-    getCurrentUser,
+    user,
+    isAuthenticated,
+    loading,
+    error,
+    login: handleLogin,
+    register: handleRegister,
+    logout: handleLogout,
+    changePassword: handleChangePassword,
+    fetchCurrentUser,
+    clearError: handleClearError,
   };
 };

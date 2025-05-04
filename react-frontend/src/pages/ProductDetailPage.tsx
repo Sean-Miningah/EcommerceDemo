@@ -1,50 +1,43 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageLayout } from "@/components/layout/PageLayout";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/hooks/api/useCart"
+import { useProducts } from "@/hooks/api/useProducts";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ProductData } from "@/types/api";
-import apiClient from "@/lib/api/client";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { RefreshCcw } from "lucide-react";
 
 const ProductDetailPage = () => {
   const { id } = useParams<{ id: string }>();
-  const [product, setProduct] = useState<ProductData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const { addItem } = useCart();
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-  // Fetch product details from API
-  const fetchProduct = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiClient.get<ProductData>(`/products/${id}/`);
-      setProduct(response.data);
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Failed to fetch product details.';
-      setError(errorMessage);
-      console.error("Error fetching product:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { product, loading, error, getProductById, clearProduct } = useProducts();
+  const { addToCart } = useCart();
 
   useEffect(() => {
-    fetchProduct();
-  }, [id]);
+    if (id) {
+      getProductById(parseInt(id));
+    }
+
+    // Clean up when component unmounts
+    return () => {
+      clearProduct();
+    };
+  }, [id, getProductById, clearProduct]);
 
   const handleAddToCart = async () => {
     if (product) {
+      setIsAddingToCart(true);
       try {
-        await addItem(product, quantity);
+        // Use Redux cart action
+        await addToCart(parseInt(product.id), quantity);
       } catch (err) {
         console.error("Error adding item to cart:", err);
+      } finally {
+        setIsAddingToCart(false);
       }
     }
   };
@@ -56,7 +49,7 @@ const ProductDetailPage = () => {
     }
   };
 
-  if (isLoading) {
+  if (loading) {
     return (
       <PageLayout>
         <div className="container mx-auto px-4 py-8">
@@ -91,7 +84,7 @@ const ProductDetailPage = () => {
           </Alert>
           <div className="flex justify-center space-x-4">
             <Button
-              onClick={fetchProduct}
+              onClick={() => id && getProductById(parseInt(id))} // Use the Redux action
               variant="outline"
               className="flex items-center gap-2"
             >
@@ -213,9 +206,19 @@ const ProductDetailPage = () => {
                 size="lg"
                 className="flex items-center"
                 onClick={handleAddToCart}
+                disabled={isAddingToCart}
               >
-                <ShoppingCart className="mr-2 h-4 w-4" />
-                Add to Cart
+                {isAddingToCart ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    Add to Cart
+                  </>
+                )}
               </Button>
 
               <Button

@@ -1,10 +1,11 @@
-
-import { useState,} from "react";
+import { useState } from "react";
 import { Link } from "react-router";
-import { ShoppingCart, User, Menu, X, Search } from "lucide-react";
+import { ShoppingCart, User, Menu, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuthContext } from '@/contexts/AuthContext';
-import { useCart } from "@/contexts/CartContext";
+// import { logout } from '@/store/slices/authSlice';
+import { useAuth } from '@/hooks/api/useAuth';
+import { useCart } from '@/hooks/api/useCart';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,12 +22,11 @@ import {
 } from "@/components/ui/sheet";
 
 export function Header() {
-  const { user, isAuthenticated } = useAuthContext();
-  const { itemCount } = useCart();
+  const { user, isAuthenticated, logout: handleLogout } = useAuth();
+  const { cartItems } = useCart();
+  const itemCount = cartItems.length;
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-
-  console.log("The user is", user, "authenication is", isAuthenticated)
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur">
       <div className="container flex h-16 items-center justify-between px-4">
@@ -42,7 +42,7 @@ export function Header() {
             <Link to="/products" className="text-sm font-medium hover:text-primary transition-colors">
               Products
             </Link>
-            {user?.role === "admin" && (
+            {user?.role === "ADMIN" && (
               <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
                 Admin
               </Link>
@@ -69,7 +69,7 @@ export function Header() {
             </Button>
           </Link>
 
-          {user ? (
+          {isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon">
@@ -78,7 +78,7 @@ export function Header() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem className="font-medium">
-                  {user?.name}
+                  {user?.username}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
@@ -88,7 +88,7 @@ export function Header() {
                   <Link to="/orders">My Orders</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout}>
+                <DropdownMenuItem onClick={handleLogout}>
                   Logout
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -124,7 +124,7 @@ export function Header() {
                 >
                   Products
                 </Link>
-                {user?.role === "admin" && (
+                {user?.role === "ADMIN" && (
                   <Link
                     to="/admin"
                     className="text-lg font-medium"

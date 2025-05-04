@@ -1,14 +1,14 @@
 import {
   createBrowserRouter,
-  RouterProvider,
+  RouterProvider, Outlet
 } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
-import { CartProvider } from "@/contexts/CartContext";
-import { ProductProvider } from "@/contexts/ProductContext";
-import { OrderProvider } from '@/contexts/OrderContext';
+import { Provider as ReduxProvider } from 'react-redux';
+import { store } from '@/store';
+import { AuthLayout } from '@/components/layout/AuthLayout';
+import { RouteGuard } from '@/components/layout/RouteGuard'
 
 // Pages
 import Index from "./pages/Index";
@@ -25,78 +25,101 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminPage from "./pages/AdminPage";
 import NotFound from "./pages/NotFound";
 
+
+export const AuthLayoutWrapper = () => {
+  return (
+    <AuthLayout>
+      <Outlet />
+    </AuthLayout>
+  );
+};
+
 const router = createBrowserRouter([
   {
-    path: "/",
-    element: <Index />
-  },
-  {
-    path: "/products",
-    element: <ProductsPage />
-  },
-  {
-    path: "/products/:id",
-    element: <ProductDetailPage />
-  },
-  {
-    path: "/cart",
-    element: <CartPage />
-  },
-  {
-    path: "/checkout",
-    element: <CheckoutPage />
-  },
-  {
-    path: "/order-confirmation",
-    element: <OrderConfirmationPage />
-  },
-  {
-    path: "/orders",
-    element: <OrdersPage />
-  },
-  {
-    path: "/login",
-    element: <LoginPage />
-  },
-  {
-    path: "/signup",
-    element: <SignupPage />
-  },
-  {
-    path: "/forgot-password",
-    element: <ForgotPasswordPage />
-  },
-  {
-    path: "reset-password",
-    element: <ResetPasswordPage />
-  },
-  {
-    path: "/admin",
-    element: <AdminPage />
-  },
-  {
-    path: "*",
-    element: <NotFound />
+    element: <AuthLayoutWrapper />,
+    children: [
+      {
+        path: "/",
+        element: <Index />
+      },
+      {
+        path: "/products",
+        element: <ProductsPage />
+      },
+      {
+        path: "/products/:id",
+        element: <ProductDetailPage />
+      },
+      {
+        path: "/cart",
+        element: <CartPage />
+      },
+      {
+        path: "/checkout",
+        element: (
+          <RouteGuard>
+            <CheckoutPage />
+          </RouteGuard>
+        )
+      },
+      {
+        path: "/order-confirmation",
+        element: (
+          <RouteGuard>
+            <OrderConfirmationPage />
+          </RouteGuard>
+        )
+      },
+      {
+        path: "/orders",
+        element: (
+          <RouteGuard>
+            <OrdersPage />
+          </RouteGuard>
+        )
+      },
+      {
+        path: "/login",
+        element: <LoginPage />
+      },
+      {
+        path: "/signup",
+        element: <SignupPage />
+      },
+      {
+        path: "/forgot-password",
+        element: <ForgotPasswordPage />
+      },
+      {
+        path: "reset-password",
+        element: <ResetPasswordPage />
+      },
+      {
+        path: "/admin",
+        element: (
+          <RouteGuard adminOnly={true}>
+            <AdminPage />
+          </RouteGuard>
+        )
+      },
+      {
+        path: "*",
+        element: <NotFound />
+      }
+    ]
   }
-])
-
+]);
 const queryClient = new QueryClient();
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <ProductProvider>
-          <CartProvider>
-            <OrderProvider>
-              <TooltipProvider>
-                <Toaster />
-                <RouterProvider router={router} />
-              </TooltipProvider>
-            </OrderProvider>
-          </CartProvider>
-        </ProductProvider>
-      </AuthProvider>
+      <ReduxProvider store={store}>
+        <TooltipProvider>
+          <Toaster />
+          <RouterProvider router={router} />
+        </TooltipProvider>
+      </ReduxProvider>
     </QueryClientProvider>
   )
 }

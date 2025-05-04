@@ -1,19 +1,20 @@
 import { ProductCard } from "./ProductCard";
-import { useProducts } from "@/contexts/ProductContext";
+import { useProducts } from "@/hooks/api/useProducts"; // Import the new Redux hook
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import type { ProductData } from '@/types/api'
 
 export function ProductGrid() {
   const {
-    filteredProducts,
-    isLoading,
+    products,
+    loading,
     error,
-    refetch
+    getProducts
   } = useProducts();
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
         {Array.from({ length: 8 }).map((_, index) => (
@@ -42,7 +43,7 @@ export function ProductGrid() {
         </Alert>
         <div className="flex justify-center">
           <Button
-            onClick={() => refetch()}
+            onClick={() => getProducts()}
             variant="outline"
             className="flex items-center gap-2"
           >
@@ -54,7 +55,7 @@ export function ProductGrid() {
     );
   }
 
-  if (filteredProducts.length === 0) {
+  if (products.length === 0) {
     return (
       <div className="text-center py-12">
         <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
@@ -67,7 +68,7 @@ export function ProductGrid() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-      {filteredProducts.map((product) => (
+      {products.map((product: ProductData) => (
         <ProductCard key={product.id} product={product} />
       ))}
     </div>

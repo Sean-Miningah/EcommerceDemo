@@ -1,27 +1,32 @@
-import { useState } from 'react';
-import { ProductData } from '@/types/api';
+import { useState, useEffect } from 'react';
+import { CategoryData, ProductData } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useProducts } from '@/contexts/ProductContext';
+import { useProducts } from '@/hooks/api/useProducts';
 
 type ProductFormProps = {
   product?: ProductData;
-  onSubmit: (data: any) => Promise<void>;
+  onSubmit: (data: FormData) => Promise<void>;
   isLoading: boolean;
 };
 
 export function ProductForm({ product, onSubmit, isLoading }: ProductFormProps) {
-  const { categories } = useProducts();
+  const { categories, getCategories } = useProducts();
+
+  // Fetch categories when component mounts
+  useEffect(() => {
+    getCategories();
+  }, [getCategories]);
 
   const [formData, setFormData] = useState({
     name: product?.name || '',
     description: product?.description || '',
     price: product?.price || 0,
     category: product?.category || '',
-    image: null as File | null, // For new image uploads
+    image: null as File | null,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -53,7 +58,7 @@ export function ProductForm({ product, onSubmit, isLoading }: ProductFormProps) 
       data.append('image', formData.image);
     }
 
-    await onSubmit(data);
+    await onSubmit(data); // Pass FormData directly
   };
 
   return (
@@ -98,15 +103,15 @@ export function ProductForm({ product, onSubmit, isLoading }: ProductFormProps) 
       <div className="space-y-2">
         <Label htmlFor="category">Category</Label>
         <Select
-          value={formData.category}
+          value={formData.category.toString()} // Convert to string as category ID might be a number
           onValueChange={handleSelectChange}
         >
           <SelectTrigger>
             <SelectValue placeholder="Select a category" />
           </SelectTrigger>
           <SelectContent>
-            {categories.map(category => (
-              <SelectItem key={category.id} value={category.id}>
+            {categories.map((category: CategoryData) => (
+              <SelectItem key={category.id} value={category.id.toString()}>
                 {category.name}
               </SelectItem>
             ))}
